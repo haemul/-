@@ -5,5 +5,5 @@
 - qtype.h 코드 추가
 - queue.cpp 구현
 - main.cpp 테스트용 임시 수정
-- 오류는 뜨지 않고 결과 값은 나오지만 degbug erorr 뜸 수정 필요
+- 실행은 되어 결과값은 나오지만 degbug erorr 뜸 수정 필요
 
