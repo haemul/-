@@ -2,9 +2,7 @@
 #include <thread>
 #include <atomic>
 #include "queue.h"
-
-#include <vector> // 테스트를 위한 임시 추가
-#include <chrono> // 테스트를 위한 임시 추가
+#include <chrono> 
 
 using namespace std;
 
@@ -15,8 +13,8 @@ using namespace std;
 #define REQUEST_PER_CLIENT 10000
 #define NUM_CLIENTS 4
 
-atomic<int> sum_key = 0;
-atomic<int> sum_value = 0;
+atomic<int> sum_key = 1;
+atomic<int> sum_value = 2;
 //atomic<double> response_time_tot = 0.0;
 
 typedef enum {
@@ -56,35 +54,47 @@ void client_func(Queue* queue, Request* requests, int n_request, int client_id) 
 }
 
 int main() {
+
     srand(static_cast<unsigned int>(time(NULL)));
 
     Queue* queue = init();
+    if (!queue) {
+        cerr << "Queue initialization failed!" << endl;
+        return 1;
+    }
 
-    vector<Request*> all_requests(NUM_CLIENTS);
+    Request* all_requests[NUM_CLIENTS];
+    thread client_threads[NUM_CLIENTS];
 
     for (int c = 0; c < NUM_CLIENTS; ++c) {
         all_requests[c] = new Request[REQUEST_PER_CLIENT];
+
         for (int i = 0; i < REQUEST_PER_CLIENT / 2; ++i) {
             int size = rand() % 1024 + 1;
             uint8_t* buffer = new uint8_t[size];
             buffer[0] = rand() % 256;
+
             all_requests[c][i].op = SET;
             all_requests[c][i].item.key = rand() % 10000000;
             all_requests[c][i].item.value = buffer;
         }
+
         for (int i = REQUEST_PER_CLIENT / 2; i < REQUEST_PER_CLIENT; ++i) {
             all_requests[c][i].op = GET;
+            all_requests[c][i].item.key = 0;
+            all_requests[c][i].item.value = nullptr;
         }
     }
 
-    vector<thread> clients;
     auto start = chrono::high_resolution_clock::now();
 
     for (int i = 0; i < NUM_CLIENTS; ++i) {
-        clients.emplace_back(client_func, queue, all_requests[i], REQUEST_PER_CLIENT, i);
+        client_threads[i] = thread(client_func, queue, all_requests[i], REQUEST_PER_CLIENT, i);
     }
 
-    for (auto& t : clients) t.join();
+    for (int i = 0; i < NUM_CLIENTS; ++i) {
+        client_threads[i].join();
+    }
 
     auto finish = chrono::high_resolution_clock::now();
     auto total_time = chrono::duration_cast<chrono::milliseconds>(finish - start).count();
@@ -94,9 +104,14 @@ int main() {
     cout << "[Main] sum of returned values = " << sum_value << endl;
 
     for (int i = 0; i < NUM_CLIENTS; ++i) {
+        for (int j = 0; j < REQUEST_PER_CLIENT / 2; ++j) {
+            delete[] reinterpret_cast<uint8_t*>(all_requests[i][j].item.value);
+        }
         delete[] all_requests[i];
     }
 
     release(queue);
+    queue = nullptr;
+
     return 0;
 }
