@@ -11,4 +11,6 @@
 - debug erorr를 막기 위한 qtype.h 수정
 - debug erorr를 막기 위한 queue.cpp 수정
 - main문 vector 제거 후 코드 수정
-
+- 깊은 복사를 위한 qtype.h 수정
+- 깊은 복사 및 update를 위한 queue.cpp 수정
+- 바뀐 코드를 돌리기 위한 main.cpp 수정
