@@ -1,5 +1,6 @@
 #include <iostream>
 #include "queue.h"
+#include <cstring>
 
 
 Queue* init(void) {
@@ -17,31 +18,12 @@ void release(Queue* queue) {
         while (curr) {
             Node* temp = curr;
             curr = curr->next;
-            nfree(temp);
+
+            delete[] reinterpret_cast<uint8_t*>(temp->item.value);
+            delete temp;
         }
     }
-
     delete queue;
-}
-
-
-Node* nalloc(Item item) {
-    // Node 생성, item으로 초기화
-    Node* node = new Node;
-    node->item = item;
-    node->next = nullptr;
-    return node;
-}
-
-
-void nfree(Node* node) {
-    delete node;
-}
-
-
-Node* nclone(Node* node) {
-    if (!node) return nullptr;
-    return nalloc(node->item);
 }
 
 
@@ -49,18 +31,46 @@ Reply enqueue(Queue* queue, Item item) {
     Reply reply = { false, item };
     if (!queue) return reply;
 
-    Node* new_node = nalloc(item);
     std::lock_guard<std::mutex> lock(queue->lock);
+
+    Node* curr = queue->head;
+    while (curr) {
+        if (curr->item.key == item.key) {
+
+            delete[] reinterpret_cast<uint8_t*>(curr->item.value);
+
+            uint8_t* copied = new uint8_t[item.size];
+            std::memcpy(copied, item.value, item.size);
+
+            curr->item.value = copied;
+            curr->item.size = item.size;
+
+            reply.success = true;
+            reply.item.key = item.key;
+            reply.item.value = copied;
+            reply.item.size = item.size;
+            return reply;
+        }
+        curr = curr->next;
+    }
+
+    Node* new_node = new Node;
+    uint8_t* copied = new uint8_t[item.size];
+    std::memcpy(copied, item.value, item.size);
+
+    new_node->item = { item.key, copied, item.size };
+    new_node->next = nullptr;
 
     if (!queue->head || item.key > queue->head->item.key) {
         new_node->next = queue->head;
         queue->head = new_node;
         reply.success = true;
+        reply.item.value = copied;
         return reply;
     }
 
     Node* prev = queue->head;
-    Node* curr = queue->head->next;
+    curr = queue->head->next;
 
     while (curr && curr->item.key >= item.key) {
         prev = curr;
@@ -71,6 +81,7 @@ Reply enqueue(Queue* queue, Item item) {
     new_node->next = curr;
 
     reply.success = true;
+    reply.item.value = copied;
     return reply;
 }
 
@@ -85,9 +96,10 @@ Reply dequeue(Queue* queue) {
     Node* temp = queue->head;
     queue->head = temp->next;
 
-    reply.item = temp->item;
     reply.success = true;
-    nfree(temp);
+    reply.item = temp->item;
+
+    delete temp;
     return reply;
 }
 
@@ -102,7 +114,11 @@ Queue* range(Queue* queue, Key start, Key end) {
     Node* curr = queue->head;
     while (curr) {
         if (curr->item.key >= start && curr->item.key <= end) {
-            enqueue(new_queue, curr->item);
+            Item item;
+            item.key = curr->item.key;
+            item.size = curr->item.size;
+            item.value = curr->item.value;
+            enqueue(new_queue, item);
         }
         curr = curr->next;
     }
