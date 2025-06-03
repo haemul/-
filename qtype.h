@@ -4,7 +4,6 @@
 // ==========이 파일은 수정 가능==========
 
 #include <mutex>
-#include <cstdint>
 
 typedef unsigned int Key;  // 값이 클수록 높은 우선순위
 typedef void* Value;
@@ -26,12 +25,17 @@ typedef struct node_t {
     // 필드 추가 가능
 } Node;
 
-typedef struct {
-    Node* head, *tail;
-    std::mutex mtx; // thread safety
-    // 필드 추가 가능
-} Queue;
-
 // 이후 자유롭게 추가/수정: 새로운 자료형 정의 등
 
+struct Queue {
+    Node* head;
+    std::mutex lock;
+
+    Queue() : head(nullptr) {}
+    Queue(const Queue&) = delete;
+    Queue& operator=(const Queue&) = delete;
+};
+
+
 #endif
+
