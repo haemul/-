@@ -2,7 +2,9 @@
 #include <thread>
 #include <atomic>
 #include "queue.h"
-#include <chrono> 
+#include <chrono>
+#include <cstdlib>
+#include <ctime>
 
 using namespace std;
 
@@ -13,8 +15,8 @@ using namespace std;
 #define REQUEST_PER_CLIENT 10000
 #define NUM_CLIENTS 4
 
-atomic<int> sum_key = 1;
-atomic<int> sum_value = 2;
+atomic<int> sum_key = 0;
+atomic<int> sum_value = 0;
 //atomic<double> response_time_tot = 0.0;
 
 typedef enum {
@@ -67,7 +69,7 @@ int main() {
     thread client_threads[NUM_CLIENTS];
 
     for (int c = 0; c < NUM_CLIENTS; ++c) {
-        all_requests[c] = new Request[REQUEST_PER_CLIENT];
+    all_requests[c] = new Request[REQUEST_PER_CLIENT];
 
         for (int i = 0; i < REQUEST_PER_CLIENT / 2; ++i) {
             int size = rand() % 1024 + 1;
@@ -77,12 +79,14 @@ int main() {
             all_requests[c][i].op = SET;
             all_requests[c][i].item.key = rand() % 10000000;
             all_requests[c][i].item.value = buffer;
+            all_requests[c][i].item.size = size;
         }
 
         for (int i = REQUEST_PER_CLIENT / 2; i < REQUEST_PER_CLIENT; ++i) {
             all_requests[c][i].op = GET;
             all_requests[c][i].item.key = 0;
             all_requests[c][i].item.value = nullptr;
+            all_requests[c][i].item.size = 0;
         }
     }
 
