@@ -28,7 +28,7 @@ void release(Queue* queue) {
 
 
 Reply enqueue(Queue* queue, Item item) {
-    Reply reply = { false, item };
+    Reply reply = { false, { item.key, nullptr, item.size } };
     if (!queue) return reply;
 
     std::lock_guard<std::mutex> lock(queue->lock);
@@ -45,9 +45,12 @@ Reply enqueue(Queue* queue, Item item) {
             curr->item.value = copied;
             curr->item.size = item.size;
 
+            uint8_t* reply_copy = new uint8_t[item.size];
+            std::memcpy(reply_copy, copied, item.size);
+
             reply.success = true;
             reply.item.key = item.key;
-            reply.item.value = copied;
+            reply.item.value = reply_copy;
             reply.item.size = item.size;
             return reply;
         }
@@ -64,29 +67,29 @@ Reply enqueue(Queue* queue, Item item) {
     if (!queue->head || item.key > queue->head->item.key) {
         new_node->next = queue->head;
         queue->head = new_node;
-        reply.success = true;
-        reply.item.value = copied;
-        return reply;
+    }
+    else{
+        Node* prev = queue->head;
+        curr = queue->head->next;
+        while (curr && curr->item.key >= item.key) {
+            prev = curr;
+            curr = curr->next;
+        }
+        prev->next = new_node;
+        new_node->next = curr;
     }
 
-    Node* prev = queue->head;
-    curr = queue->head->next;
-
-    while (curr && curr->item.key >= item.key) {
-        prev = curr;
-        curr = curr->next;
-    }
-
-    prev->next = new_node;
-    new_node->next = curr;
-
+    uint8_t* reply_copy = new uint8_t[item.size];
+    std::memcpy(reply_copy, copied, item.size);
     reply.success = true;
-    reply.item.value = copied;
+    reply.item.key = item.key;
+    reply.item.value = reply_copy;
+    reply.item.size = item.size;
     return reply;
 }
 
 Reply dequeue(Queue* queue) {
-    Reply reply = { false, {0, nullptr} };
+    Reply reply = { false, {0, nullptr, 0} };
     if (!queue) return reply;
 
     std::lock_guard<std::mutex> lock(queue->lock);
@@ -96,9 +99,14 @@ Reply dequeue(Queue* queue) {
     Node* temp = queue->head;
     queue->head = temp->next;
 
+    uint8_t* copied = new uint8_t[temp->item.size];
+    std::memcpy(copied, temp->item.value, temp->item.size);
+    reply.item.key = temp->item.key;
+    reply.item.value = copied;
+    reply.item.size = temp->item.size;
     reply.success = true;
-    reply.item = temp->item;
 
+    delete[] reinterpret_cast<uint8_t*>(temp->item.value);
     delete temp;
     return reply;
 }
@@ -114,10 +122,13 @@ Queue* range(Queue* queue, Key start, Key end) {
     Node* curr = queue->head;
     while (curr) {
         if (curr->item.key >= start && curr->item.key <= end) {
+            uint8_t* copied = new uint8_t[curr->item.size];
+            std::memcpy(copied, curr->item.value, curr->item.size);
+
             Item item;
             item.key = curr->item.key;
             item.size = curr->item.size;
-            item.value = curr->item.value;
+            item.value = copied;
             enqueue(new_queue, item);
         }
         curr = curr->next;
