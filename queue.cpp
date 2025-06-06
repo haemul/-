@@ -14,6 +14,7 @@ void release(Queue* queue) {
     {
         std::lock_guard<std::mutex> lock(queue->lock);
 
+        
         Node* curr = queue->head;
         while (curr) {
             Node* temp = curr;
