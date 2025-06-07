@@ -2,6 +2,31 @@
 #include "queue.h"
 #include <cstring>
 
+void sift_up(Queue* queue, int idx) {
+    while (idx > 0) {
+        int parent = (idx - 1) / 2;
+        if (queue->data[parent].key >= queue->data[idx].key) break;
+        std::swap(queue->data[parent], queue->data[idx]);
+        idx = parent;
+    }
+}
+
+void sift_down(Queue* queue, int idx) {
+    while (true) {
+        int left = 2 * idx + 1;
+        int right = 2 * idx + 2;
+        int largest = idx;
+
+        if (left < queue->size && queue->data[left].key > queue->data[largest].key)
+            largest = left;
+        if (right < queue->size && queue->data[right].key > queue->data[largest].key)
+            largest = right;
+
+        if (largest == idx) break;
+        std::swap(queue->data[idx], queue->data[largest]);
+        idx = largest;
+    }
+}
 
 Queue* init(void) {
     return new Queue();
@@ -31,7 +56,12 @@ Reply enqueue(Queue* queue, Item item) {
 
     uint8_t* copied = new uint8_t[item.size];
     std::memcpy(copied, item.value, item.size);
-    queue->data[queue->size++] = { item.key, copied, item.size };
+
+    int idx = queue->size;
+    queue->data[idx] = { item.key, copied, item.size };
+    queue->size++;
+
+    sift_up(queue, idx);
 
     uint8_t* reply_copy = new uint8_t[item.size];
     std::memcpy(reply_copy, copied, item.size);
@@ -41,20 +71,13 @@ Reply enqueue(Queue* queue, Item item) {
 }
 
 Reply dequeue(Queue* queue) {
-    Reply reply = { false, {0, nullptr, 0} };
+    Reply reply = { false, { 0, nullptr, 0 } };
     if (!queue) return reply;
 
     std::lock_guard<std::mutex> lock(queue->lock);
-
     if (!queue->is_alive || queue->size == 0) return reply;
 
-    int max_index = 0;
-    for (int i = 1; i < queue->size; ++i) {
-        if (queue->data[i].key > queue->data[max_index].key)
-            max_index = i;
-    }
-
-    Item top = queue->data[max_index];
+    Item top = queue->data[0];
 
     uint8_t* copied = new uint8_t[top.size];
     std::memcpy(copied, top.value, top.size);
@@ -62,8 +85,12 @@ Reply dequeue(Queue* queue) {
     reply.success = true;
 
     delete[] reinterpret_cast<uint8_t*>(top.value);
-    queue->data[max_index] = queue->data[queue->size - 1];
+
     queue->size--;
+    if (queue->size > 0) {
+        queue->data[0] = queue->data[queue->size];
+        sift_down(queue, 0);
+    }
 
     return reply;
 }
@@ -76,7 +103,6 @@ Queue* range(Queue* queue, Key start, Key end) {
     if (!new_queue) return nullptr;
 
     std::lock_guard<std::mutex> lock(queue->lock);
-
     if (!queue->is_alive) return new_queue;
 
     for (int i = 0; i < queue->size; ++i) {
@@ -88,5 +114,6 @@ Queue* range(Queue* queue, Key start, Key end) {
             enqueue(new_queue, new_item);
         }
     }
+
     return new_queue;
 }
