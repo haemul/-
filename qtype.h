@@ -29,14 +29,20 @@ typedef struct node_t {
 // 이후 자유롭게 추가/수정: 새로운 자료형 정의 등
 
 const int MAX_ITEMS = 65536; // 속도 안정성을 위한 코드
+const int MAX_KEY = 10000000;
 
 struct Queue {
     Item data[MAX_ITEMS];
+    int index_map[MAX_KEY];
     int size;
     bool is_alive;
     std::mutex lock;
 
-    Queue() : size(0), is_alive(true) {}
+    Queue() : size(0), is_alive(true) {
+        for (int i = 0; i < MAX_KEY; ++i)
+            index_map[i] = -1;
+    }
+
     Queue(const Queue&) = delete;
     Queue& operator=(const Queue&) = delete;
 };
