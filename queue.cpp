@@ -2,11 +2,17 @@
 #include "queue.h"
 #include <cstring>
 
+void swap_item(Queue* queue, int a, int b) {
+    std::swap(queue->data[a], queue->data[b]);
+    queue->index_map[queue->data[a].key] = a;
+    queue->index_map[queue->data[b].key] = b;
+}
+
 void sift_up(Queue* queue, int idx) {
     while (idx > 0) {
         int parent = (idx - 1) / 2;
         if (queue->data[parent].key >= queue->data[idx].key) break;
-        std::swap(queue->data[parent], queue->data[idx]);
+        swap_item(queue, parent, idx);
         idx = parent;
     }
 }
@@ -23,12 +29,12 @@ void sift_down(Queue* queue, int idx) {
             largest = right;
 
         if (largest == idx) break;
-        std::swap(queue->data[idx], queue->data[largest]);
+        swap_item(queue, idx, largest);
         idx = largest;
     }
 }
 
-Queue* init(void) {
+Queue* init() {
     return new Queue();
 }
 
@@ -39,10 +45,10 @@ void release(Queue* queue) {
     std::lock_guard<std::mutex> lock(queue->lock);
     queue->is_alive = false;
 
-    for (int i = 0; i < queue->size; ++i) {
+    for (int i = 0; i < queue->size; ++i)
         delete[] reinterpret_cast<uint8_t*>(queue->data[i].value);
-    }
     queue->size = 0;
+
 }
 
 
@@ -52,6 +58,27 @@ Reply enqueue(Queue* queue, Item item) {
 
     std::lock_guard<std::mutex> lock(queue->lock);
     if (!queue->is_alive) return reply;
+
+    int& pos = queue->index_map[item.key];
+
+    if (pos != -1) {
+        delete[] reinterpret_cast<uint8_t*>(queue->data[pos].value);
+        uint8_t* copied = new uint8_t[item.size];
+        std::memcpy(copied, item.value, item.size);
+
+        queue->data[pos].value = copied;
+        queue->data[pos].size = item.size;
+
+        sift_up(queue, pos);
+        sift_down(queue, pos);
+
+        uint8_t* reply_copy = new uint8_t[item.size];
+        std::memcpy(reply_copy, copied, item.size);
+        reply.success = true;
+        reply.item = { item.key, reply_copy, item.size };
+        return reply;
+    }
+
     if (queue->size >= MAX_ITEMS) return reply;
 
     uint8_t* copied = new uint8_t[item.size];
@@ -59,6 +86,7 @@ Reply enqueue(Queue* queue, Item item) {
 
     int idx = queue->size;
     queue->data[idx] = { item.key, copied, item.size };
+    queue->index_map[item.key] = idx;
     queue->size++;
 
     sift_up(queue, idx);
@@ -78,6 +106,7 @@ Reply dequeue(Queue* queue) {
     if (!queue->is_alive || queue->size == 0) return reply;
 
     Item top = queue->data[0];
+    queue->index_map[top.key] = -1;
 
     uint8_t* copied = new uint8_t[top.size];
     std::memcpy(copied, top.value, top.size);
@@ -89,6 +118,7 @@ Reply dequeue(Queue* queue) {
     queue->size--;
     if (queue->size > 0) {
         queue->data[0] = queue->data[queue->size];
+        queue->index_map[queue->data[0].key] = 0;
         sift_down(queue, 0);
     }
 
