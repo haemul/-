@@ -22,3 +22,5 @@
 - qtype.h 속도 향상을 위한 배열로 전환
 - queue.cpp 속도 향상을 위한 배열로 전환
 - queue.cpp 속도 향상을 위한 힙정렬 적용
+- qtype.h 중복 key 처리 기능 추가
+- queue.cpp 중복 key 처리 기능 추가
