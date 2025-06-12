@@ -38,7 +38,6 @@ Queue* init() {
     return new Queue();
 }
 
-
 void release(Queue* queue) {
     if (!queue) return;
 
@@ -48,12 +47,10 @@ void release(Queue* queue) {
     for (int i = 0; i < queue->size; ++i)
         delete[] reinterpret_cast<uint8_t*>(queue->data[i].value);
     queue->size = 0;
-
 }
 
-
 Reply enqueue(Queue* queue, Item item) {
-    Reply reply = { false, { item.key, nullptr, item.size } };
+    Reply reply = { false, { item.key, nullptr, item.value_size } };
     if (!queue) return reply;
 
     std::lock_guard<std::mutex> lock(queue->lock);
@@ -63,38 +60,38 @@ Reply enqueue(Queue* queue, Item item) {
 
     if (pos != -1) {
         delete[] reinterpret_cast<uint8_t*>(queue->data[pos].value);
-        uint8_t* copied = new uint8_t[item.size];
-        std::memcpy(copied, item.value, item.size);
+        uint8_t* copied = new uint8_t[item.value_size];
+        std::memcpy(copied, item.value, item.value_size);
 
         queue->data[pos].value = copied;
-        queue->data[pos].size = item.size;
+        queue->data[pos].value_size = item.value_size;
 
         sift_up(queue, pos);
         sift_down(queue, pos);
 
-        uint8_t* reply_copy = new uint8_t[item.size];
-        std::memcpy(reply_copy, copied, item.size);
+        uint8_t* reply_copy = new uint8_t[item.value_size];
+        std::memcpy(reply_copy, copied, item.value_size);
         reply.success = true;
-        reply.item = { item.key, reply_copy, item.size };
+        reply.item = { item.key, reply_copy, item.value_size };
         return reply;
     }
 
     if (queue->size >= MAX_ITEMS) return reply;
 
-    uint8_t* copied = new uint8_t[item.size];
-    std::memcpy(copied, item.value, item.size);
+    uint8_t* copied = new uint8_t[item.value_size];
+    std::memcpy(copied, item.value, item.value_size);
 
     int idx = queue->size;
-    queue->data[idx] = { item.key, copied, item.size };
+    queue->data[idx] = { item.key, copied, item.value_size };
     queue->index_map[item.key] = idx;
     queue->size++;
 
     sift_up(queue, idx);
 
-    uint8_t* reply_copy = new uint8_t[item.size];
-    std::memcpy(reply_copy, copied, item.size);
+    uint8_t* reply_copy = new uint8_t[item.value_size];
+    std::memcpy(reply_copy, copied, item.value_size);
     reply.success = true;
-    reply.item = { item.key, reply_copy, item.size };
+    reply.item = { item.key, reply_copy, item.value_size };
     return reply;
 }
 
@@ -108,9 +105,9 @@ Reply dequeue(Queue* queue) {
     Item top = queue->data[0];
     queue->index_map[top.key] = -1;
 
-    uint8_t* copied = new uint8_t[top.size];
-    std::memcpy(copied, top.value, top.size);
-    reply.item = { top.key, copied, top.size };
+    uint8_t* copied = new uint8_t[top.value_size];
+    std::memcpy(copied, top.value, top.value_size);
+    reply.item = { top.key, copied, top.value_size };
     reply.success = true;
 
     delete[] reinterpret_cast<uint8_t*>(top.value);
@@ -125,7 +122,6 @@ Reply dequeue(Queue* queue) {
     return reply;
 }
 
-
 Queue* range(Queue* queue, Key start, Key end) {
     if (!queue) return nullptr;
 
@@ -138,9 +134,9 @@ Queue* range(Queue* queue, Key start, Key end) {
     for (int i = 0; i < queue->size; ++i) {
         Item it = queue->data[i];
         if (it.key >= start && it.key <= end) {
-            uint8_t* copied = new uint8_t[it.size];
-            std::memcpy(copied, it.value, it.size);
-            Item new_item = { it.key, copied, it.size };
+            uint8_t* copied = new uint8_t[it.value_size];
+            std::memcpy(copied, it.value, it.value_size);
+            Item new_item = { it.key, copied, it.value_size };
             enqueue(new_queue, new_item);
         }
     }

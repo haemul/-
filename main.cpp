@@ -8,25 +8,20 @@
 
 using namespace std;
 
-// 초간단 구동 테스트
-// 주의: 아래 정의(Operation, Request)는 예시일 뿐
-// 큐의 Item은 void*이므로 얼마든지 달라질 수 있음
-
 #define REQUEST_PER_CLIENT 10000
 #define NUM_CLIENTS 4
 
-atomic<int> sum_key = 0;
+atomic<unsigned long long> sum_key = 0;
 atomic<int> sum_value = 0;
-//atomic<double> response_time_tot = 0.0;
 
 typedef enum {
-	GET,
-	SET,
+    GET,
+    SET,
 } Operation;
 
 typedef struct {
-	Operation op;
-	Item item;
+    Operation op;
+    Item item;
 } Request;
 
 void client_func(Queue* queue, Request* requests, int n_request, int client_id) {
@@ -38,7 +33,8 @@ void client_func(Queue* queue, Request* requests, int n_request, int client_id) 
     for (int i = 0; i < n_request; ++i) {
         if (requests[i].op == GET) {
             reply = dequeue(queue);
-        } else {
+        }
+        else {
             reply = enqueue(queue, requests[i].item);
         }
 
@@ -56,7 +52,6 @@ void client_func(Queue* queue, Request* requests, int n_request, int client_id) 
 }
 
 int main() {
-
     srand(static_cast<unsigned int>(time(NULL)));
 
     Queue* queue = init();
@@ -69,7 +64,7 @@ int main() {
     thread client_threads[NUM_CLIENTS];
 
     for (int c = 0; c < NUM_CLIENTS; ++c) {
-    all_requests[c] = new Request[REQUEST_PER_CLIENT];
+        all_requests[c] = new Request[REQUEST_PER_CLIENT];
 
         for (int i = 0; i < REQUEST_PER_CLIENT / 2; ++i) {
             int size = rand() % 1024 + 1;
@@ -79,14 +74,14 @@ int main() {
             all_requests[c][i].op = SET;
             all_requests[c][i].item.key = rand() % 10000000;
             all_requests[c][i].item.value = buffer;
-            all_requests[c][i].item.size = size;
+            all_requests[c][i].item.value_size = size;
         }
 
         for (int i = REQUEST_PER_CLIENT / 2; i < REQUEST_PER_CLIENT; ++i) {
             all_requests[c][i].op = GET;
             all_requests[c][i].item.key = 0;
             all_requests[c][i].item.value = nullptr;
-            all_requests[c][i].item.size = 0;
+            all_requests[c][i].item.value_size = 0;
         }
     }
 
